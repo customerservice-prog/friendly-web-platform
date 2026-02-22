@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
+    "postbuild": "node scripts/standalone-copy-static.mjs",
     "start": "node .next/standalone/apps/dashboard/server.js"
   },
   "dependencies": {
