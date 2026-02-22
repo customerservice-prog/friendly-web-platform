@@ -4,6 +4,7 @@ import sensible from '@fastify/sensible';
 import { z } from 'zod';
 import { getPool, initDb } from './db.js';
 import { getBearerToken, hashPassword, signToken, verifyPassword, verifyToken } from './auth.js';
+import { registerPasswordResetRoutes } from './password-reset.js';
 
 const app = Fastify({ logger: true });
 await app.register(sensible);
@@ -21,7 +22,13 @@ app.decorateRequest('auth', null);
 app.addHook('preHandler', async (req) => {
   // Public routes (use req.url because req.routerPath can be undefined in some cases)
   const url = req.url || '';
-  if (url === '/' || url.startsWith('/health') || url.startsWith('/auth')) return;
+  if (
+    url === '/' ||
+    url.startsWith('/health') ||
+    url.startsWith('/auth') ||
+    url.startsWith('/password-reset')
+  )
+    return;
 
   const token = getBearerToken(req);
   if (!token) throw app.httpErrors.unauthorized('Missing bearer token');
@@ -37,6 +44,9 @@ app.addHook('preHandler', async (req) => {
 // --- Health ---
 app.get('/health', async () => ({ ok: true, service: 'api' }));
 app.get('/', async () => ({ name: 'friendly-web-platform api', docs: '/health' }));
+
+// --- Password reset (MVP, no email) ---
+registerPasswordResetRoutes(app, pool);
 
 // --- Auth routes ---
 app.post('/auth/signup', async (req) => {

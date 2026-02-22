@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { useAppContext } from '../app-context';
+import { ResetPasswordClient } from './reset-password-client';
 
 export function AuthPageClient() {
   const { apiBase, setToken } = useAppContext();
@@ -21,6 +22,7 @@ export function AuthPageClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [showReset, setShowReset] = useState(false);
 
   async function apiFetch(path: string, init?: RequestInit) {
     const res = await fetch(`${apiBase}${path}`, {
@@ -71,7 +73,10 @@ export function AuthPageClient() {
             </div>
           ) : null}
 
-          <Card>
+          {showReset ? (
+            <ResetPasswordClient onBack={() => setShowReset(false)} />
+          ) : (
+            <Card>
             <CardHeader>
               <CardTitle>{mode === 'signup' ? 'Create your account' : 'Welcome back'}</CardTitle>
               <CardDescription>
@@ -128,9 +133,20 @@ export function AuthPageClient() {
                 <Button onClick={submit} disabled={busy}>
                   {busy ? 'Working…' : mode === 'signup' ? 'Create account' : 'Log in'}
                 </Button>
+
+                {mode === 'login' ? (
+                  <button
+                    type="button"
+                    className="text-left text-xs text-slate-500 hover:text-slate-700"
+                    onClick={() => setShowReset(true)}
+                  >
+                    Forgot your password?
+                  </button>
+                ) : null}
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       </main>
     </div>
