@@ -2,7 +2,6 @@ services:
   - type: web
     name: friendly-api
     runtime: node
-    plan: starter
     rootDir: services/api
     buildCommand: npm ci
     startCommand: npm run start
@@ -19,7 +18,6 @@ services:
   - type: worker
     name: friendly-worker
     runtime: node
-    plan: starter
     rootDir: services/worker
     buildCommand: npm ci
     startCommand: npm run start
@@ -38,7 +36,6 @@ services:
   - type: web
     name: friendly-dashboard
     runtime: node
-    plan: starter
     rootDir: apps/dashboard
     buildCommand: npm ci && npm run build
     startCommand: npm run start
@@ -49,13 +46,9 @@ services:
 
 databases:
   - name: friendly-postgres
-    # Render deprecated legacy Postgres plans like 'starter'.
-    # Use a current plan name supported by your Render account (commonly: 'basic').
-    plan: basic
     databaseName: friendly
     user: friendly
 
 redis:
   - name: friendly-redis
-    plan: starter
     ipAllowList: []
