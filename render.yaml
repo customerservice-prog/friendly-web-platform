@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: friendly-api
+    runtime: node
+    plan: starter
+    rootDir: services/api
+    buildCommand: npm ci
+    startCommand: npm run start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: friendly-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: friendly-redis
+          property: connectionString
+
+  - type: worker
+    name: friendly-worker
+    runtime: node
+    plan: starter
+    rootDir: services/worker
+    buildCommand: npm ci
+    startCommand: npm run start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: friendly-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: friendly-redis
+          property: connectionString
+      - key: QUEUE_NAME
+        value: default
+
+  - type: web
+    name: friendly-dashboard
+    runtime: node
+    plan: starter
+    rootDir: apps/dashboard
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://friendly-api.onrender.com
+
+databases:
+  - name: friendly-postgres
+    plan: starter
+    databaseName: friendly
+    user: friendly
+
+  - name: friendly-redis
+    plan: starter
+    ipAllowList: []
