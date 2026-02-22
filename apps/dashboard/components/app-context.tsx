@@ -29,14 +29,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 
   const [mounted, setMounted] = useState(false);
-  const [token, setTokenState] = useState('');
+  const [token, setTokenState] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('auth_token') || '';
+  });
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState('');
 
   useEffect(() => {
     setMounted(true);
-    const t = localStorage.getItem('auth_token');
-    if (t) setTokenState(t);
   }, []);
 
   function setToken(t: string) {
