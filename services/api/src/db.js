@@ -65,5 +65,33 @@ export async function initDb(pool) {
     );
 
     create index if not exists idx_password_reset_tokens_user_id on password_reset_tokens(user_id);
+
+    create table if not exists github_installations (
+      id uuid primary key default gen_random_uuid(),
+      org_id uuid references orgs(id) on delete cascade,
+      installation_id bigint not null unique,
+      account_login text not null,
+      account_type text not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists idx_github_installations_org_id on github_installations(org_id);
+
+    create table if not exists site_repos (
+      id uuid primary key default gen_random_uuid(),
+      org_id uuid not null references orgs(id) on delete cascade,
+      site_id uuid not null references sites(id) on delete cascade,
+      provider text not null default 'github',
+      repo_full_name text not null,
+      default_branch text not null default 'main',
+      installation_id bigint,
+      created_at timestamptz not null default now(),
+      unique (site_id),
+      unique (repo_full_name)
+    );
+
+    create index if not exists idx_site_repos_org_id on site_repos(org_id);
+    create index if not exists idx_site_repos_site_id on site_repos(site_id);
   `);
 }

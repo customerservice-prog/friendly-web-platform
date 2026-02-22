@@ -5,9 +5,20 @@ import { z } from 'zod';
 import { getPool, initDb } from './db.js';
 import { getBearerToken, hashPassword, signToken, verifyPassword, verifyToken } from './auth.js';
 import { registerPasswordResetRoutes } from './password-reset.js';
+import { verifyGitHubWebhook } from './github-webhook.js';
+import rawBody from 'fastify-raw-body';
 
 const app = Fastify({ logger: true });
 await app.register(sensible);
+
+// Needed so we can verify GitHub webhooks.
+await app.register(rawBody, {
+  field: 'rawBody',
+  global: false,
+  encoding: false,
+  runFirst: true
+});
+
 await app.register(cors, {
   origin: true,
   credentials: true
@@ -47,6 +58,46 @@ app.get('/', async () => ({ name: 'friendly-web-platform api', docs: '/health' }
 
 // --- Password reset (MVP, no email) ---
 registerPasswordResetRoutes(app, pool);
+
+// --- GitHub App webhook (installation tracking) ---
+app.post('/integrations/github/webhook', { config: { rawBody: true } }, async (req) => {
+  const ok = await verifyGitHubWebhook(req);
+  if (!ok) throw app.httpErrors.unauthorized('Invalid webhook signature');
+
+  const event = req.headers['x-github-event'];
+  const delivery = req.headers['x-github-delivery'];
+  const payload = req.body;
+
+  // We primarily care about installation created/deleted.
+  if (event === 'installation') {
+    const action = payload.action;
+    const installationId = payload.installation?.id;
+    const accountLogin = payload.installation?.account?.login;
+    const accountType = payload.installation?.account?.type;
+
+    if (installationId && accountLogin && accountType) {
+      if (action === 'created') {
+        await pool.query(
+          `insert into github_installations (installation_id, account_login, account_type)
+           values ($1, $2, $3)
+           on conflict (installation_id) do update set
+             account_login=excluded.account_login,
+             account_type=excluded.account_type,
+             updated_at=now()`,
+          [installationId, accountLogin, accountType]
+        );
+      }
+
+      if (action === 'deleted') {
+        await pool.query(`delete from github_installations where installation_id=$1`, [installationId]);
+      }
+    }
+
+    return { ok: true, event, action, delivery };
+  }
+
+  return { ok: true, event, ignored: true, delivery };
+});
 
 // --- Auth routes ---
 app.post('/auth/signup', async (req) => {
