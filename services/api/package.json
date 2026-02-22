@@ -11,8 +11,11 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/jwt": "^10.0.0",
     "@fastify/sensible": "^6.0.4",
+    "@octokit/auth-app": "^8.2.0",
+    "@octokit/rest": "^22.0.1",
     "bcryptjs": "^3.0.3",
     "fastify": "^5.6.0",
+    "fastify-raw-body": "^5.0.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.18.0",
     "zod": "^4.3.6"

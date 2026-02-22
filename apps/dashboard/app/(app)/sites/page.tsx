@@ -68,6 +68,7 @@ export default function SitesPage() {
   }
 
   useEffect(() => {
+    // Avoid redirect flicker: AppProvider loads token from localStorage.
     if (!token) {
       router.replace('/');
       return;
