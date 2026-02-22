@@ -6,6 +6,7 @@ import { getPool, initDb } from './db.js';
 import { getBearerToken, hashPassword, signToken, verifyPassword, verifyToken } from './auth.js';
 import { registerPasswordResetRoutes } from './password-reset.js';
 import { verifyGitHubWebhook } from './github-webhook.js';
+import { getInstallationOctokit } from './github-app.js';
 import rawBody from 'fastify-raw-body';
 
 const app = Fastify({ logger: true });
@@ -212,6 +213,118 @@ async function requireOrgMember(userId, orgId) {
   return res.rows[0].role;
 }
 
+function requireOrgAdminRole(role) {
+  if (role !== 'owner' && role !== 'admin') throw app.httpErrors.forbidden('Insufficient role');
+}
+
+// --- GitHub integration (org + repos) ---
+app.get('/orgs/:orgId/integrations/github', async (req) => {
+  const userId = req.auth.user_id;
+  const orgId = req.params.orgId;
+  const role = await requireOrgMember(userId, orgId);
+
+  const res = await pool.query(
+    `select installation_id, account_login, account_type, created_at, updated_at
+     from github_installations
+     where org_id=$1
+     order by updated_at desc
+     limit 1`,
+    [orgId]
+  );
+
+  return { linked: res.rowCount > 0, role, installation: res.rows[0] ?? null };
+});
+
+app.post('/orgs/:orgId/integrations/github/link', async (req) => {
+  const userId = req.auth.user_id;
+  const orgId = req.params.orgId;
+  const role = await requireOrgMember(userId, orgId);
+  requireOrgAdminRole(role);
+
+  const body = z
+    .object({
+      account_login: z.string().min(1)
+    })
+    .parse(req.body);
+
+  // Find latest installation for that account_login (inserted via webhook)
+  const inst = await pool.query(
+    `select installation_id
+     from github_installations
+     where account_login=$1
+     order by updated_at desc
+     limit 1`,
+    [body.account_login]
+  );
+
+  if (inst.rowCount === 0) {
+    throw app.httpErrors.badRequest(
+      `No GitHub installation found for ${body.account_login}. Ensure the app is installed and the webhook delivered.`
+    );
+  }
+
+  const installationId = inst.rows[0].installation_id;
+
+  await pool.query(
+    `update github_installations set org_id=$1, updated_at=now() where installation_id=$2`,
+    [orgId, installationId]
+  );
+
+  return { ok: true, org_id: orgId, installation_id: installationId, account_login: body.account_login };
+});
+
+app.post('/orgs/:orgId/sites/:siteId/repo', async (req) => {
+  const userId = req.auth.user_id;
+  const { orgId, siteId } = req.params;
+  const role = await requireOrgMember(userId, orgId);
+  requireOrgAdminRole(role);
+
+  const siteRes = await pool.query(`select id, org_id, slug, name from sites where org_id=$1 and id=$2`, [orgId, siteId]);
+  if (siteRes.rowCount === 0) throw app.httpErrors.notFound('Site not found');
+  const site = siteRes.rows[0];
+
+  const instRes = await pool.query(
+    `select installation_id, account_login
+     from github_installations
+     where org_id=$1
+     order by updated_at desc
+     limit 1`,
+    [orgId]
+  );
+  if (instRes.rowCount === 0) throw app.httpErrors.badRequest('GitHub is not linked for this org');
+
+  const { installation_id, account_login } = instRes.rows[0];
+
+  const octokit = getInstallationOctokit(Number(installation_id));
+  const repoName = site.slug;
+
+  // Create repo (or attach if already exists)
+  let fullName = `${account_login}/${repoName}`;
+
+  try {
+    await octokit.repos.get({ owner: account_login, repo: repoName });
+  } catch (e) {
+    // Not found -> create
+    await octokit.repos.createInOrg({
+      org: account_login,
+      name: repoName,
+      private: true,
+      description: `Site repo for ${site.name}`
+    });
+  }
+
+  await pool.query(
+    `insert into site_repos (org_id, site_id, provider, repo_full_name, default_branch, installation_id)
+     values ($1, $2, 'github', $3, 'main', $4)
+     on conflict (site_id) do update set
+       repo_full_name=excluded.repo_full_name,
+       installation_id=excluded.installation_id`,
+    [orgId, siteId, fullName, installation_id]
+  );
+
+  return { ok: true, repo_full_name: fullName };
+});
+
 // --- Sites CRUD ---
 app.get('/orgs/:orgId/sites', async (req) => {
   const userId = req.auth.user_id;
@@ -219,10 +332,12 @@ app.get('/orgs/:orgId/sites', async (req) => {
   await requireOrgMember(userId, orgId);
 
   const res = await pool.query(
-    `select id, org_id, type, status, name, slug, industry, created_at, updated_at
-     from sites
-     where org_id=$1
-     order by created_at desc`,
+    `select s.id, s.org_id, s.type, s.status, s.name, s.slug, s.industry, s.created_at, s.updated_at,
+            r.repo_full_name
+     from sites s
+     left join site_repos r on r.site_id = s.id
+     where s.org_id=$1
+     order by s.created_at desc`,
     [orgId]
   );
   return { sites: res.rows };

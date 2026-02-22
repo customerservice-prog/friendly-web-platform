@@ -18,6 +18,7 @@ type Site = {
   name: string;
   slug: string;
   industry: string | null;
+  repo_full_name?: string | null;
 };
 
 function slugify(s: string) {
@@ -36,6 +37,9 @@ export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const [githubLinked, setGithubLinked] = useState(false);
+  const [githubAccount, setGithubAccount] = useState<string>('');
 
   const [newSiteOpen, setNewSiteOpen] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
@@ -61,6 +65,18 @@ export default function SitesPage() {
     return json;
   }
 
+  async function loadGitHubStatus() {
+    if (!selectedOrgId) return;
+    try {
+      const data = await apiFetch(`/orgs/${selectedOrgId}/integrations/github`);
+      setGithubLinked(Boolean(data.linked));
+      setGithubAccount(data.installation?.account_login || '');
+    } catch {
+      setGithubLinked(false);
+      setGithubAccount('');
+    }
+  }
+
   async function loadSites() {
     if (!selectedOrgId) return;
     const data = await apiFetch(`/orgs/${selectedOrgId}/sites`);
@@ -73,6 +89,7 @@ export default function SitesPage() {
       router.replace('/');
       return;
     }
+    loadGitHubStatus().catch(() => {});
     loadSites().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedOrgId]);
@@ -110,10 +127,42 @@ export default function SitesPage() {
         </Alert>
       ) : null}
 
-      <div className="flex justify-end">
-        <Button onClick={() => setNewSiteOpen(true)} disabled={!selectedOrgId}>
-          <Plus size={16} className="mr-2" /> New site
-        </Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-xs text-slate-500">
+          GitHub: {githubLinked ? (
+            <span className="font-medium text-slate-700">Linked ({githubAccount})</span>
+          ) : (
+            <span className="font-medium text-slate-700">Not linked</span>
+          )}
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <Button
+            variant="outline"
+            disabled={!selectedOrgId || githubLinked || busy}
+            onClick={async () => {
+              setError('');
+              setBusy(true);
+              try {
+                await apiFetch(`/orgs/${selectedOrgId}/integrations/github/link`, {
+                  method: 'POST',
+                  body: JSON.stringify({ account_login: 'customerservice-prog' })
+                });
+                await loadGitHubStatus();
+              } catch (e: any) {
+                setError(e?.message || 'Failed to link GitHub');
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {githubLinked ? 'GitHub linked' : 'Link GitHub'}
+          </Button>
+
+          <Button onClick={() => setNewSiteOpen(true)} disabled={!selectedOrgId}>
+            <Plus size={16} className="mr-2" /> New site
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -127,12 +176,49 @@ export default function SitesPage() {
           ) : (
             <div className="divide-y divide-border">
               {sites.map((s) => (
-                <div key={s.id} className="flex items-center justify-between py-3">
+                <div key={s.id} className="flex items-center justify-between py-3 gap-4">
                   <div>
                     <div className="font-medium text-slate-900">{s.name}</div>
                     <div className="text-xs text-slate-500">
                       <span className="font-mono">{s.slug}</span> • {s.type} • {s.status}
+                      {s.repo_full_name ? (
+                        <>
+                          {' '}• Repo: <span className="font-mono">{s.repo_full_name}</span>
+                        </>
+                      ) : null}
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {!s.repo_full_name ? (
+                      <Button
+                        variant="outline"
+                        disabled={!githubLinked || busy}
+                        onClick={async () => {
+                          setError('');
+                          setBusy(true);
+                          try {
+                            await apiFetch(`/orgs/${selectedOrgId}/sites/${s.id}/repo`, { method: 'POST' });
+                            await loadSites();
+                          } catch (e: any) {
+                            setError(e?.message || 'Failed to create repo');
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Create repo
+                      </Button>
+                    ) : (
+                      <a
+                        className="text-sm text-blue-700 hover:underline"
+                        href={`https://github.com/${s.repo_full_name}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open repo
+                      </a>
+                    )}
                   </div>
                 </div>
               ))}
