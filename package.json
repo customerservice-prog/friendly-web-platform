@@ -1,0 +1,23 @@
+{
+  "name": "friendly-web-platform",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Multi-tenant website design + hosting platform (control plane + data plane)",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo 'Use: npm run dev -w services/api'",
+    "lint": "echo 'todo'",
+    "compose:up": "docker compose -f infra/docker/compose.yml up -d",
+    "compose:down": "docker compose -f infra/docker/compose.yml down",
+    "compose:logs": "docker compose -f infra/docker/compose.yml logs -f --tail=200"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/customerservice-prog/friendly-web-platform.git"
+  },
+  "license": "UNLICENSED"
+}
