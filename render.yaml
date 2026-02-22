@@ -11,8 +11,9 @@ services:
           name: friendly-postgres
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
           name: friendly-redis
+          type: redis
           property: connectionString
 
   - type: worker
@@ -27,8 +28,9 @@ services:
           name: friendly-postgres
           property: connectionString
       - key: REDIS_URL
-        fromRedis:
+        fromService:
           name: friendly-redis
+          type: redis
           property: connectionString
       - key: QUEUE_NAME
         value: default
@@ -44,11 +46,11 @@ services:
       - key: NEXT_PUBLIC_API_BASE_URL
         value: https://friendly-api.onrender.com
 
+  - type: redis
+    name: friendly-redis
+    ipAllowList: []
+
 databases:
   - name: friendly-postgres
     databaseName: friendly
     user: friendly
-
-redis:
-  - name: friendly-redis
-    ipAllowList: []
