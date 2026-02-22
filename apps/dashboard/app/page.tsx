@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { NotHydratedHint } from './not-hydrated';
 
 type Org = { id: string; name: string; role: string };
 type Site = {
@@ -31,6 +32,7 @@ function slugify(s: string) {
 export default function Home() {
   const api = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
   const [token, setToken] = useState<string>('');
+  const [mounted, setMounted] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [orgName, setOrgName] = useState('');
@@ -51,6 +53,7 @@ export default function Home() {
   const authHeader = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   useEffect(() => {
+    setMounted(true);
     const t = localStorage.getItem('auth_token');
     if (t) setToken(t);
   }, []);
@@ -166,11 +169,22 @@ export default function Home() {
               API: <span className="font-mono">{api}</span>
             </div>
           </div>
-          {token ? (
-            <Button variant="outline" onClick={logout}>
-              Logout
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-3">
+            <div
+              className={
+                'rounded-full px-2 py-1 text-[11px] ' +
+                (mounted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')
+              }
+              title={mounted ? 'Client JS is running' : 'If this stays yellow, the page did not hydrate'}
+            >
+              {mounted ? 'Live' : 'Loading'}
+            </div>
+            {token ? (
+              <Button variant="outline" onClick={logout}>
+                Logout
+              </Button>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -261,6 +275,8 @@ export default function Home() {
                     Tip: make sure <span className="font-mono">NEXT_PUBLIC_API_BASE_URL</span> points at your real API
                     URL.
                   </div>
+
+                  <NotHydratedHint />
                 </div>
               </CardContent>
             </Card>
