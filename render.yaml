@@ -12,7 +12,7 @@ services:
           name: friendly-postgres
           property: connectionString
       - key: REDIS_URL
-        fromDatabase:
+        fromRedis:
           name: friendly-redis
           property: connectionString
 
@@ -29,7 +29,7 @@ services:
           name: friendly-postgres
           property: connectionString
       - key: REDIS_URL
-        fromDatabase:
+        fromRedis:
           name: friendly-redis
           property: connectionString
       - key: QUEUE_NAME
@@ -43,15 +43,19 @@ services:
     buildCommand: npm ci && npm run build
     startCommand: npm run start
     envVars:
+      # Update this after first deploy if Render assigns a different API hostname.
       - key: NEXT_PUBLIC_API_BASE_URL
         value: https://friendly-api.onrender.com
 
 databases:
   - name: friendly-postgres
-    plan: starter
+    # Render deprecated legacy Postgres plans like 'starter'.
+    # Use a current plan name supported by your Render account (commonly: 'basic').
+    plan: basic
     databaseName: friendly
     user: friendly
 
+redis:
   - name: friendly-redis
     plan: starter
     ipAllowList: []
