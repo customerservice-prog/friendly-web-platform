@@ -19,8 +19,9 @@ await initDb(pool);
 app.decorateRequest('auth', null);
 
 app.addHook('preHandler', async (req) => {
-  // Public routes
-  if (req.routerPath?.startsWith('/health') || req.routerPath?.startsWith('/auth') || req.routerPath === '/') return;
+  // Public routes (use req.url because req.routerPath can be undefined in some cases)
+  const url = req.url || '';
+  if (url === '/' || url.startsWith('/health') || url.startsWith('/auth')) return;
 
   const token = getBearerToken(req);
   if (!token) throw app.httpErrors.unauthorized('Missing bearer token');

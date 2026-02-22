@@ -24,6 +24,8 @@ export default function Home() {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
   const [sites, setSites] = useState<Site[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>('');
 
   const authHeader = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -41,8 +43,18 @@ export default function Home() {
         ...(token ? authHeader : {})
       }
     });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.message || `Request failed (${res.status})`);
+
+    const text = await res.text();
+    let json: any = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      json = { message: text };
+    }
+
+    if (!res.ok) {
+      throw new Error(json?.message || json?.error || `Request failed (${res.status})`);
+    }
     return json;
   }
 
@@ -70,22 +82,30 @@ export default function Home() {
   }, [token, selectedOrgId]);
 
   async function handleAuth() {
-    if (mode === 'signup') {
-      const data = await apiFetch('/auth/signup', {
+    setError('');
+    setBusy(true);
+    try {
+      if (mode === 'signup') {
+        const data = await apiFetch('/auth/signup', {
+          method: 'POST',
+          body: JSON.stringify({ email, password, orgName })
+        });
+        localStorage.setItem('auth_token', data.token);
+        setToken(data.token);
+        return;
+      }
+
+      const data = await apiFetch('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password, orgName })
+        body: JSON.stringify({ email, password })
       });
       localStorage.setItem('auth_token', data.token);
       setToken(data.token);
-      return;
+    } catch (e: any) {
+      setError(e?.message || 'Login failed');
+    } finally {
+      setBusy(false);
     }
-
-    const data = await apiFetch('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    localStorage.setItem('auth_token', data.token);
-    setToken(data.token);
   }
 
   async function createSite() {
@@ -143,7 +163,20 @@ export default function Home() {
                 onChange={(e) => setOrgName(e.target.value)}
               />
             ) : null}
-            <button onClick={() => handleAuth().catch((e) => alert(e.message))}>Continue</button>
+            {error ? (
+              <div style={{ color: '#b00020', fontSize: 14, paddingTop: 4 }}>
+                {error}
+                {error.includes('JWT_SECRET') ? (
+                  <div style={{ marginTop: 6, color: '#555' }}>
+                    Fix: in Render set <code>JWT_SECRET</code> on <strong>friendly-api</strong> and{' '}
+                    <strong>friendly-worker</strong>, then redeploy.
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <button onClick={handleAuth} disabled={busy}>
+              {busy ? 'Working…' : 'Continue'}
+            </button>
           </div>
         </section>
       ) : (

@@ -1,11 +1,17 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+function getJwtSecret() {
+  return process.env.JWT_SECRET;
+}
 
 export function requireJwtSecret() {
-  if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
-  return JWT_SECRET;
+  const s = getJwtSecret();
+  if (!s) {
+    // Throw a descriptive error so clients understand this is server config.
+    throw new Error('Server misconfigured: JWT_SECRET is required');
+  }
+  return s;
 }
 
 export async function hashPassword(password) {
